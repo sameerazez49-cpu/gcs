@@ -864,25 +864,941 @@
     <!-- ========================================== -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // ضع أكواد مشروعك من Firebase هنا بدلاً من القيم التقريبية:
+        // بيانات مشروعك الحقيقي على Firebase GCS s
         const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT_ID.appspot.com",
-            messagingSenderId: "1234567890",
-            appId: "YOUR_APP_ID"
+            apiKey: "AIzaSyAjuiI9pAtfRidqPOLRQ5Msq1FBqhEN0w6k",
+            authDomain: "gcs-s-f18bb.firebaseapp.com",
+            projectId: "gcs-s-f18bb",
+            storageBucket: "gcs-s-f18bb.firebasestorage.app",
+            messagingSenderId: "603716945465",
+            appId: "1:603716945465:web:62843c3ad96a1efab3afe8",
+            measurementId: "G-YJMCVWR3SQ"
         };
 
-        // تهيئة قاعدة بيانات Firebase
+        // تهيئة اتصال Firebase Firestore
         try {
             const app = initializeApp(firebaseConfig);
             const db = getFirestore(app);
-            console.log("تم الاتصال بـ Firebase بنجاح!");
+            window.db = db;
+            console.log("تم الاتصال بـ Firebase Firestore لمشروع gcs-s-f18bb بنجاح!");
+
+            // مزامنة المخزن لحظياً من Firebase
+            onSnapshot(collection(db, "inventory"), (snapshot) => {
+                const items = [];
+                snapshot.forEach((doc) => items.push({ id: doc.id, ...doc.data() }));
+                if (items.length > 0) {
+                    inventory = items;
+                    localStorage.setItem('gcs_inventory', JSON.stringify(inventory));
+                    if (typeof renderInventoryTable === 'function') renderInventoryTable();
+                    if (typeof renderSelectProducts === 'function') renderSelectProducts();
+                }
+            });
         } catch (e) {
-            console.warn("تنبيه: يرجى وضع بيانت firebaseConfig الصحيحة للاتصال المباشر.");
+            console.error("خطأ في الاتصال بـ Firebase:", e);
+        }
+    </script>
+</body>
+</html><!-- ... existing code -->
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Cairo Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        /* CSS الأساسي لضمان عدم ظهور صفحة زرقاء أو فضية */
+        html, body {
+            background-color: #0f172a !important;
+            color: #f8fafc !important;
+            margin: 0;
+            padding: 0;
+            font-family: 'Cairo', system-ui, -apple-system, sans-serif !important;
+            min-height: 100vh;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                background: white !important;
+                color: black !important;
+            }
+            .print-card {
+                background: white !important;
+                border: 1px solid #ddd !important;
+                color: black !important;
+                box-shadow: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col pb-10">
+
+    <!-- Status Bar -->
+    <div class="no-print bg-emerald-950 text-emerald-300 text-xs py-2 px-4 text-center font-bold flex justify-center items-center gap-2 border-b border-emerald-800 shadow-sm">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span>المنظومة متصلة أونلاين 🌐 - تم تفعيل المزامنة المباشرة لشركة GCS بين جميع الأجهزة والموبايلات</span>
+    </div>
+
+    <!-- Header Navigation Bar -->
+    <header class="no-print bg-slate-800 border-b border-slate-700 sticky top-0 z-40 shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-black text-xl shadow-md">G</div>
+                <div>
+                    <h1 class="text-xl font-bold text-white tracking-wide">GCS Systems</h1>
+                    <p class="text-xs text-slate-400">إدارة الفواتير، المخزن، والصيانة</p>
+                </div>
+            </div>
+            
+            <nav class="flex flex-wrap gap-2 text-sm font-semibold">
+                <button onclick="switchTab('invoice')" id="nav-invoice" class="tab-btn px-4 py-2 rounded-lg transition-all bg-indigo-600 text-white shadow">الفواتير / عروض الأسعار</button>
+                <button onclick="switchTab('inventory')" id="nav-inventory" class="tab-btn px-4 py-2 rounded-lg transition-all text-slate-300 hover:bg-slate-700">المخزن والتعديل</button>
+                <button onclick="switchTab('maintenance')" id="nav-maintenance" class="tab-btn px-4 py-2 rounded-lg transition-all text-slate-300 hover:bg-slate-700">قسم الصيانة</button>
+                <button onclick="switchTab('suppliers')" id="nav-suppliers" class="tab-btn px-4 py-2 rounded-lg transition-all text-slate-300 hover:bg-slate-700">الموردين</button>
+                <button onclick="switchTab('history')" id="nav-history" class="tab-btn px-4 py-2 rounded-lg transition-all text-slate-300 hover:bg-slate-700">سجل الفواتير</button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 py-6 w-full flex-1">
+
+        <!-- SECTION: INVOICE & QUOTE GENERATOR -->
+        <section id="section-invoice" class="tab-content">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Left Control Form -->
+                <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-md flex flex-col gap-4">
+                    <h2 class="text-lg font-bold text-indigo-400 border-b border-slate-700 pb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-file-signature"></i> بيانات المستند
+                    </h2>
+                    
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 mb-1">نوع المستند</label>
+                            <select id="docType" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+                                <option value="invoice">فاتورة مبيعات</option>
+                                <option value="quote">عرض سعر رسمي</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 mb-1">رقم المستند</label>
+                            <input type="text" id="docNum" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-200" readonly>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">اسم العميل / الشركة</label>
+                        <input type="text" id="clientName" placeholder="أدخل اسم العميل" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 mb-1">هاتف العميل</label>
+                            <input type="text" id="clientPhone" placeholder="01xxxxxxxxx" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-200">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 mb-1">التاريخ</label>
+                            <input type="date" id="docDate" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-200">
+                        </div>
+                    </div>
+
+                    <!-- Items Selection -->
+                    <div class="border-t border-slate-700 pt-3">
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">اختيار صنف من المخزن</label>
+                        <div class="flex gap-2">
+                            <select id="selectProduct" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+                                <option value="">-- اختر صنفاً --</option>
+                            </select>
+                            <button onclick="addItemToInvoice()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-bold shadow transition">إضافة</button>
+                        </div>
+                    </div>
+
+                    <!-- Financial Summary & Tax Controls -->
+                    <div class="bg-slate-900 p-4 rounded-xl border border-slate-700 mt-2 space-y-3">
+                        <div class="flex justify-between items-center text-sm">
+                            <span class="text-slate-400">الإجمالي قبل الضريبة:</span>
+                            <span id="subTotal" class="font-bold text-slate-200">0.00 ج.م</span>
+                        </div>
+
+                        <div class="flex items-center justify-between border-t border-slate-800 pt-2">
+                            <label class="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-300">
+                                <input type="checkbox" id="enableVat" onchange="calculateInvoiceTotals()" class="w-4 h-4 rounded text-indigo-600 focus:ring-0 bg-slate-800 border-slate-700">
+                                إضافة ضريبة قيمة مضافة
+                            </label>
+                            <div class="flex items-center gap-1">
+                                <input type="number" id="vatPercent" value="14" oninput="calculateInvoiceTotals()" class="w-14 bg-slate-800 border border-slate-700 rounded text-center p-1 text-xs text-indigo-300 font-bold">
+                                <span class="text-xs text-slate-400">%</span>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-between items-center text-sm">
+                            <span class="text-slate-400">قيمة الضريبة:</span>
+                            <span id="vatValue" class="font-bold text-amber-400">0.00 ج.م</span>
+                        </div>
+
+                        <div class="flex items-center justify-between border-t border-slate-800 pt-2 text-sm">
+                            <span class="text-slate-400">الخصم المباشر (ج.م):</span>
+                            <input type="number" id="discountVal" value="0" oninput="calculateInvoiceTotals()" class="w-24 bg-slate-800 border border-slate-700 rounded text-left p-1 text-xs text-rose-400 font-bold">
+                        </div>
+
+                        <div class="flex justify-between items-center text-base border-t border-slate-700 pt-3 font-extrabold">
+                            <span class="text-indigo-400">الصافي النهائي الشامل:</span>
+                            <span id="grandTotal" class="text-emerald-400 text-lg">0.00 ج.م</span>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-2 pt-2">
+                        <button onclick="saveAndPrintInvoice()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl font-bold shadow-lg transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-print"></i> حفظ وحفظ الفاتورة / طباعة
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Right Invoice Live Preview -->
+                <div class="lg:col-span-2 bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-md flex flex-col justify-between">
+                    <div>
+                        <!-- Document Header Preview -->
+                        <div class="flex justify-between items-start border-b border-slate-700 pb-4 mb-4">
+                            <div>
+                                <h2 class="text-2xl font-black text-white" id="previewTitle">فاتورة مبيعات</h2>
+                                <p class="text-xs text-indigo-400 font-bold mt-1">شركة GCS للحلول التكنولوجية والأمنية</p>
+                                <p class="text-xs text-slate-400 mt-0.5">الهاتف: 01000000000 | القاهرة - مصر</p>
+                            </div>
+                            <div class="text-left">
+                                <span class="bg-indigo-950 text-indigo-300 border border-indigo-700/50 text-xs px-3 py-1 rounded-full font-bold inline-block mb-1" id="previewDocNum">#INV-1001</span>
+                                <p class="text-xs text-slate-400" id="previewDate">التاريخ: 2026-11-06</p>
+                            </div>
+                        </div>
+
+                        <!-- Client Info Preview -->
+                        <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700/50 mb-4 grid grid-cols-2 gap-2 text-xs">
+                            <div><span class="text-slate-400">العميل: </span><strong class="text-slate-200" id="previewClientName">نقدي</strong></div>
+                            <div><span class="text-slate-400">الهاتف: </span><strong class="text-slate-200" id="previewClientPhone"> غير محدد </strong></div>
+                        </div>
+
+                        <!-- Table -->
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-xs text-right text-slate-300">
+                                <thead class="bg-slate-900 text-slate-400 uppercase font-semibold">
+                                    <tr>
+                                        <th class="p-2.5 rounded-r-lg">م</th>
+                                        <th class="p-2.5">الصنف / الوصف</th>
+                                        <th class="p-2.5 text-center">الكمية</th>
+                                        <th class="p-2.5 text-center">السعر</th>
+                                        <th class="p-2.5 text-center">الإجمالي</th>
+                                        <th class="p-2.5 rounded-l-lg text-center no-print">حذف</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="invoiceItemsTable" class="divide-y divide-slate-700/50">
+                                    <!-- Items added dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Footer Stamp -->
+                    <div class="mt-8 border-t border-slate-700 pt-4 flex justify-between items-end text-xs text-slate-400">
+                        <div>
+                            <p class="font-bold text-slate-300">الشروط والأحكام:</p>
+                            <p class="mt-1">البضاعة المباعة لا ترد ولا تستبدل إلا خلال 14 يوماً بحالتها الأصلية.</p>
+                        </div>
+                        <div class="text-center font-bold text-slate-300">
+                            <p>التوقيع والاعتماد</p>
+                            <div class="h-10"></div>
+                            <p class="text-indigo-400">شركة GCS Systems</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION: INVENTORY MANAGEMENT & EDITING -->
+        <section id="section-inventory" class="tab-content hidden">
+            <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-md">
+                <div class="flex flex-wrap justify-between items-center gap-4 mb-5 border-b border-slate-700 pb-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-indigo-400 flex items-center gap-2">
+                            <i class="fa-solid fa-boxes-stacked"></i> إدارة المخزن والمنتجات
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-1">تعديل وإضافة وإدارة كافة المنتجات والأسعار والمخزون</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2 w-full sm:w-auto">
+                        <input type="text" id="searchInventory" oninput="renderInventoryTable()" placeholder="🔍 بحث في المخزن..." class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 w-full sm:w-48">
+                        <button onclick="openAddProductModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition shadow flex items-center gap-2">
+                            <i class="fa-solid fa-plus"></i> إضافة صنف جديد
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs text-right text-slate-300">
+                        <thead class="bg-slate-900 text-slate-400 font-semibold uppercase">
+                            <tr>
+                                <th class="p-3 rounded-r-lg">كود الصنف</th>
+                                <th class="p-3">اسم الصنف / المنتج</th>
+                                <th class="p-3 text-center">سعر البيع (ج.م)</th>
+                                <th class="p-3 text-center">سعر التكلفة (ج.م)</th>
+                                <th class="p-3 text-center">الكمية المتاحة</th>
+                                <th class="p-3 text-center rounded-l-lg">خيارات التحكم</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventoryTable" class="divide-y divide-slate-700/50">
+                            <!-- Inventory items rendered dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION: MAINTENANCE TRACKING -->
+        <section id="section-maintenance" class="tab-content hidden">
+            <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-md">
+                <div class="flex justify-between items-center mb-5 border-b border-slate-700 pb-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-indigo-400 flex items-center gap-2">
+                            <i class="fa-solid fa-wrench"></i> قسم الصيانة والمتابعة الفنية
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-1">تسجيل بلاغات الصيانة وتتبع الأجهزة والتكلفة والحالة</p>
+                    </div>
+                    <button onclick="openAddMaintenanceModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition shadow flex items-center gap-2">
+                        <i class="fa-solid fa-plus"></i> تسجيل طلب صيانة
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs text-right text-slate-300">
+                        <thead class="bg-slate-900 text-slate-400 font-semibold uppercase">
+                            <tr>
+                                <th class="p-3 rounded-r-lg">رقم الطلب</th>
+                                <th class="p-3">اسم العميل</th>
+                                <th class="p-3">نوع الجهاز / العطل</th>
+                                <th class="p-3 text-center">الفني المسؤول</th>
+                                <th class="p-3 text-center">التكلفة المتوقعة</th>
+                                <th class="p-3 text-center">الحالة</th>
+                                <th class="p-3 text-center rounded-l-lg">تحكم</th>
+                            </tr>
+                        </thead>
+                        <tbody id="maintenanceTable" class="divide-y divide-slate-700/50">
+                            <!-- Maintenance items rendered dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION: SUPPLIERS DIRECTORY -->
+        <section id="section-suppliers" class="tab-content hidden">
+            <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-md">
+                <div class="flex justify-between items-center mb-5 border-b border-slate-700 pb-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-indigo-400 flex items-center gap-2">
+                            <i class="fa-solid fa-truck-field"></i> دليل الموردين والشركات
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-1">إدارة بيانات ومحلات وموردين قطع الغيار والأجهزة</p>
+                    </div>
+                    <button onclick="openAddSupplierModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition shadow flex items-center gap-2">
+                        <i class="fa-solid fa-user-plus"></i> إضافة مورد جديد
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs text-right text-slate-300">
+                        <thead class="bg-slate-900 text-slate-400 font-semibold uppercase">
+                            <tr>
+                                <th class="p-3 rounded-r-lg">اسم المورد / الشركة</th>
+                                <th class="p-3">رقم الهاتف</th>
+                                <th class="p-3">التخصص / المنتجات</th>
+                                <th class="p-3">العنوان</th>
+                                <th class="p-3 text-center rounded-l-lg">خيارات</th>
+                            </tr>
+                        </thead>
+                        <tbody id="suppliersTable" class="divide-y divide-slate-700/50">
+                            <!-- Suppliers rendered dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION: DOCUMENT HISTORY -->
+        <section id="section-history" class="tab-content hidden">
+            <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-md">
+                <div class="flex justify-between items-center mb-5 border-b border-slate-700 pb-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-indigo-400 flex items-center gap-2">
+                            <i class="fa-solid fa-clock-rotate-left"></i> سجل الفواتير وعروض الأسعار
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-1">عرض وتصدير وإعادة طباعة كل المستندات المحفوظة</p>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs text-right text-slate-300">
+                        <thead class="bg-slate-900 text-slate-400 font-semibold uppercase">
+                            <tr>
+                                <th class="p-3 rounded-r-lg">رقم المستند</th>
+                                <th class="p-3">النوع</th>
+                                <th class="p-3">العميل</th>
+                                <th class="p-3 text-center">التاريخ</th>
+                                <th class="p-3 text-center">الإجمالي الشامل</th>
+                                <th class="p-3 text-center rounded-l-lg">معاينة وطباعة</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTable" class="divide-y divide-slate-700/50">
+                            <!-- History items rendered dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MODAL: ADD / EDIT PRODUCT -->
+    <div id="productModal" class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 max-w-md w-full shadow-2xl">
+            <h3 class="text-base font-bold text-indigo-400 border-b border-slate-700 pb-2 mb-4" id="productModalTitle">إضافة صنف جديد</h3>
+            <input type="hidden" id="modalProdId">
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block text-slate-400 mb-1">اسم المنتج</label>
+                    <input type="text" id="modalProdName" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-slate-200">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-slate-400 mb-1">سعر البيع (ج.م)</label>
+                        <input type="number" id="modalProdPrice" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-slate-200">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">سعر التكلفة (ج.م)</label>
+                        <input type="number" id="modalProdCost" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-slate-200">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-slate-400 mb-1">الكمية بالمخزن</label>
+                    <input type="number" id="modalProdQty" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-slate-200">
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 mt-5 border-t border-slate-700 pt-3">
+                <button onclick="closeProductModal()" class="px-4 py-2 bg-slate-700 text-slate-300 rounded text-xs">إلغاء</button>
+                <button onclick="saveProductModal()" class="px-4 py-2 bg-indigo-600 text-white rounded text-xs font-bold">حفظ الصنف</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD SUPPLIER -->
+    <div id="supplierModal" class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 max-w-md w-full shadow-2xl">
+            <h3 class="text-base font-bold text-emerald-400 border-b border-slate-700 pb-2 mb-4">إضافة مورد جديد</h3>
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block text-slate-400 mb-1">اسم المورد / الشركة</label>
+                    <input type="text" id="modalSuppName" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-slate-200">
+                </div>
+                <div>
+                    <label class="block text-slate-400 mb-1">رقم الهاتف</label>
+                    <input type="text" id="modalSuppPhone" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-slate-200">
+                </div>
+                <div>
+                    <label class="block text-slate-400 mb-1">التخصص / المنتجات</label>
+                    <input type="text" id="modalSuppSpec" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-slate-200">
+                </div>
+                <div>
+                    <label class="block text-slate-400 mb-1">العنوان</label>
+                    <input type="text" id="modalSuppAddr" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-slate-200">
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 mt-5 border-t border-slate-700 pt-3">
+                <button onclick="closeSupplierModal()" class="px-4 py-2 bg-slate-700 text-slate-300 rounded text-xs">إلغاء</button>
+                <button onclick="saveSupplierModal()" class="px-4 py-2 bg-emerald-600 text-white rounded text-xs font-bold">حفظ المورد</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD MAINTENANCE -->
+    <div id="maintenanceModal" class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 max-w-md w-full shadow-2xl">
+            <h3 class="text-base font-bold text-indigo-400 border-b border-slate-700 pb-2 mb-4">تسجيل طلب صيانة جديد</h3>
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block text-slate-400 mb-1">اسم العميل</label>
+                    <input type="text" id="modalMaintClient" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-slate-200">
+                </div>
+                <div>
+                    <label class="block text-slate-400 mb-1">الجهاز / العطل</label>
+                    <input type="text" id="modalMaintDevice" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-slate-200">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-slate-400 mb-1">الفني المسؤول</label>
+                        <input type="text" id="modalMaintTech" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-slate-200">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">التكلفة (ج.م)</label>
+                        <input type="number" id="modalMaintCost" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-slate-200">
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 mt-5 border-t border-slate-700 pt-3">
+                <button onclick="closeMaintenanceModal()" class="px-4 py-2 bg-slate-700 text-slate-300 rounded text-xs">إلغاء</button>
+                <button onclick="saveMaintenanceModal()" class="px-4 py-2 bg-indigo-600 text-white rounded text-xs font-bold">حفظ الطلب</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // System Data State
+        let inventory = JSON.parse(localStorage.getItem('gcs_inventory')) || [
+            { id: '101', name: 'كاميرا مراقبة Dahua 2MP', price: 650, cost: 480, qty: 15 },
+            { id: '102', name: 'جهاز تسجيل DVR 4-Chan', price: 1400, cost: 1100, qty: 8 },
+            { id: '103', name: 'باور سبلاي 12V 10A', price: 350, cost: 220, qty: 25 },
+            { id: '104', name: 'لفة كابل شبكة Cat6 305M', price: 2100, cost: 1750, qty: 5 }
+        ];
+
+        let suppliers = JSON.parse(localStorage.getItem('gcs_suppliers')) || [
+            { id: '1', name: 'شركة التقنية الحديثة', phone: '01011112222', spec: 'كاميرات وأجهزة DVR', addr: 'القاهرة - مول البستان' },
+            { id: '2', name: 'مؤسسة السلام للشبكات', phone: '01233334444', spec: 'كابلات ومحولات', addr: 'الجيزة - شارع التحرير' }
+        ];
+
+        let maintenance = JSON.parse(localStorage.getItem('gcs_maintenance')) || [
+            { id: 'M-101', client: 'أحمد محمود', device: 'DVR لا يعمل باور', tech: 'المهندس حسام', cost: 350, status: 'قيد الإصلاح' }
+        ];
+
+        let docHistory = JSON.parse(localStorage.getItem('gcs_history')) || [];
+        let currentInvoiceItems = [];
+
+        // App Initialization
+        window.onload = function() {
+            setDocDateToday();
+            generateDocNumber();
+            renderSelectProducts();
+            renderInventoryTable();
+            renderSuppliersTable();
+            renderMaintenanceTable();
+            renderHistoryTable();
+            setupLiveBinders();
+        };
+
+        // Navigation
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('bg-indigo-600', 'text-white', 'shadow');
+                btn.classList.add('text-slate-300');
+            });
+
+            document.getElementById('section-' + tabId).classList.remove('hidden');
+            const activeBtn = document.getElementById('nav-' + tabId);
+            if (activeBtn) {
+                activeBtn.classList.add('bg-indigo-600', 'text-white', 'shadow');
+                activeBtn.classList.remove('text-slate-300');
+            }
+        }
+
+        function setDocDateToday() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('docDate').value = today;
+            document.getElementById('previewDate').innerText = 'التاريخ: ' + today;
+        }
+
+        function generateDocNumber() {
+            const type = document.getElementById('docType').value;
+            const prefix = type === 'quote' ? 'Q' : 'INV';
+            const num = '#' + prefix + '-' + (Math.floor(Math.random() * 8999) + 1000);
+            document.getElementById('docNum').value = num;
+            document.getElementById('previewDocNum').innerText = num;
+            document.getElementById('previewTitle').innerText = type === 'quote' ? 'عرض سعر رسمي' : 'فاتورة مبيعات';
+        }
+
+        function setupLiveBinders() {
+            document.getElementById('clientName').addEventListener('input', (e) => {
+                document.getElementById('previewClientName').innerText = e.target.value.trim() || 'نقدي';
+            });
+            document.getElementById('clientPhone').addEventListener('input', (e) => {
+                document.getElementById('previewClientPhone').innerText = e.target.value.trim() || 'غير محدد';
+            });
+            document.getElementById('docType').addEventListener('change', generateDocNumber);
+        }
+
+        // Inventory Dynamic Rendering
+        function renderSelectProducts() {
+            const select = document.getElementById('selectProduct');
+            select.innerHTML = '<option value="">-- اختر صنفاً --</option>';
+            inventory.forEach(item => {
+                select.innerHTML += `<option value="${item.id}">${item.name} (${item.price} ج.م)</option>`;
+            });
+        }
+
+        function renderInventoryTable() {
+            const search = document.getElementById('searchInventory').value.toLowerCase();
+            const tbody = document.getElementById('inventoryTable');
+            tbody.innerHTML = '';
+
+            inventory.filter(i => i.name.toLowerCase().includes(search) || i.id.includes(search)).forEach(item => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-700/30 border-b border-slate-700/50">
+                        <td class="p-3 font-mono text-indigo-300">#${item.id}</td>
+                        <td class="p-3 font-bold text-slate-200">${item.name}</td>
+                        <td class="p-3 text-center text-emerald-400 font-bold">${item.price}</td>
+                        <td class="p-3 text-center text-slate-400">${item.cost}</td>
+                        <td class="p-3 text-center"><span class="bg-slate-900 border border-slate-700 px-2.5 py-1 rounded-full font-bold">${item.qty}</span></td>
+                        <td class="p-3 text-center space-x-2 space-x-reverse">
+                            <button onclick="openEditProductModal('${item.id}')" class="text-indigo-400 hover:text-indigo-300 p-1"><i class="fa-solid fa-pen-to-square"></i> تعديل</button>
+                            <button onclick="deleteProduct('${item.id}')" class="text-rose-400 hover:text-rose-300 p-1"><i class="fa-solid fa-trash"></i> حذف</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        // Add Item To Invoice Table
+        function addItemToInvoice() {
+            const prodId = document.getElementById('selectProduct').value;
+            if (!prodId) return;
+
+            const product = inventory.find(p => p.id === prodId);
+            if (!product) return;
+
+            const existing = currentInvoiceItems.find(i => i.id === prodId);
+            if (existing) {
+                existing.qty += 1;
+            } else {
+                currentInvoiceItems.push({
+                    id: product.id,
+                    name: product.name,
+                    price: product.price,
+                    qty: 1
+                });
+            }
+
+            renderInvoiceItems();
+        }
+
+        function renderInvoiceItems() {
+            const tbody = document.getElementById('invoiceItemsTable');
+            tbody.innerHTML = '';
+
+            currentInvoiceItems.forEach((item, index) => {
+                const itemTotal = item.price * item.qty;
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-700/20">
+                        <td class="p-2.5 font-bold">${index + 1}</td>
+                        <td class="p-2.5 font-bold text-slate-200">${item.name}</td>
+                        <td class="p-2.5 text-center">
+                            <input type="number" value="${item.qty}" min="1" onchange="updateItemQty('${item.id}', this.value)" class="w-12 bg-slate-900 border border-slate-700 rounded text-center p-1 text-slate-200">
+                        </td>
+                        <td class="p-2.5 text-center">${item.price}</td>
+                        <td class="p-2.5 text-center font-bold text-emerald-400">${itemTotal.toFixed(2)}</td>
+                        <td class="p-2.5 text-center no-print">
+                            <button onclick="removeItemFromInvoice('${item.id}')" class="text-rose-400 hover:text-rose-300"><i class="fa-solid fa-xmark"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            calculateInvoiceTotals();
+        }
+
+        function updateItemQty(id, qty) {
+            const item = currentInvoiceItems.find(i => i.id === id);
+            if (item) {
+                item.qty = Math.max(1, parseInt(qty) || 1);
+                renderInvoiceItems();
+            }
+        }
+
+        function removeItemFromInvoice(id) {
+            currentInvoiceItems = currentInvoiceItems.filter(i => i.id !== id);
+            renderInvoiceItems();
+        }
+
+        function calculateInvoiceTotals() {
+            const subTotal = currentInvoiceItems.reduce((acc, item) => acc + (item.price * item.qty), 0);
+            const enableVat = document.getElementById('enableVat').checked;
+            const vatPercent = parseFloat(document.getElementById('vatPercent').value) || 0;
+            const discount = parseFloat(document.getElementById('discountVal').value) || 0;
+
+            const vatValue = enableVat ? (subTotal * (vatPercent / 100)) : 0;
+            const grandTotal = Math.max(0, (subTotal + vatValue) - discount);
+
+            document.getElementById('subTotal').innerText = subTotal.toFixed(2) + ' ج.م';
+            document.getElementById('vatValue').innerText = vatValue.toFixed(2) + ' ج.م';
+            document.getElementById('grandTotal').innerText = grandTotal.toFixed(2) + ' ج.م';
+        }
+
+        // Save & Print Document
+        function saveAndPrintInvoice() {
+            if (currentInvoiceItems.length === 0) {
+                alert('من فضلك أضف بعض الأصناف أولاً!');
+                return;
+            }
+
+            const docData = {
+                num: document.getElementById('docNum').value,
+                type: document.getElementById('docType').value === 'quote' ? 'عرض سعر' : 'فاتورة',
+                client: document.getElementById('clientName').value || 'نقدي',
+                date: document.getElementById('docDate').value,
+                total: document.getElementById('grandTotal').innerText,
+                items: [...currentInvoiceItems]
+            };
+
+            docHistory.unshift(docData);
+            localStorage.setItem('gcs_history', JSON.stringify(docHistory));
+            renderHistoryTable();
+
+            window.print();
+        }
+
+        // Product Modal Functions
+        function openAddProductModal() {
+            document.getElementById('modalProdId').value = '';
+            document.getElementById('modalProdName').value = '';
+            document.getElementById('modalProdPrice').value = '';
+            document.getElementById('modalProdCost').value = '';
+            document.getElementById('modalProdQty').value = '';
+            document.getElementById('productModalTitle').innerText = 'إضافة صنف جديد للمخزن';
+            document.getElementById('productModal').classList.remove('hidden');
+        }
+
+        function openEditProductModal(id) {
+            const item = inventory.find(i => i.id === id);
+            if (!item) return;
+            document.getElementById('modalProdId').value = item.id;
+            document.getElementById('modalProdName').value = item.name;
+            document.getElementById('modalProdPrice').value = item.price;
+            document.getElementById('modalProdCost').value = item.cost;
+            document.getElementById('modalProdQty').value = item.qty;
+            document.getElementById('productModalTitle').innerText = 'تعديل صنف مخزني';
+            document.getElementById('productModal').classList.remove('hidden');
+        }
+
+        function closeProductModal() {
+            document.getElementById('productModal').classList.add('hidden');
+        }
+
+        function saveProductModal() {
+            const id = document.getElementById('modalProdId').value;
+            const name = document.getElementById('modalProdName').value;
+            const price = parseFloat(document.getElementById('modalProdPrice').value) || 0;
+            const cost = parseFloat(document.getElementById('modalProdCost').value) || 0;
+            const qty = parseInt(document.getElementById('modalProdQty').value) || 0;
+
+            if (!name) return;
+
+            if (id) {
+                const item = inventory.find(i => i.id === id);
+                if (item) {
+                    item.name = name;
+                    item.price = price;
+                    item.cost = cost;
+                    item.qty = qty;
+                }
+            } else {
+                inventory.push({
+                    id: String(Date.now()).slice(-4),
+                    name, price, cost, qty
+                });
+            }
+
+            localStorage.setItem('gcs_inventory', JSON.stringify(inventory));
+            renderInventoryTable();
+            renderSelectProducts();
+            closeProductModal();
+        }
+
+        function deleteProduct(id) {
+            inventory = inventory.filter(i => i.id !== id);
+            localStorage.setItem('gcs_inventory', JSON.stringify(inventory));
+            renderInventoryTable();
+            renderSelectProducts();
+        }
+
+        // Supplier Modal Functions
+        function openAddSupplierModal() {
+            document.getElementById('modalSuppName').value = '';
+            document.getElementById('modalSuppPhone').value = '';
+            document.getElementById('modalSuppSpec').value = '';
+            document.getElementById('modalSuppAddr').value = '';
+            document.getElementById('supplierModal').classList.remove('hidden');
+        }
+
+        function closeSupplierModal() {
+            document.getElementById('supplierModal').classList.add('hidden');
+        }
+
+        function saveSupplierModal() {
+            const name = document.getElementById('modalSuppName').value;
+            const phone = document.getElementById('modalSuppPhone').value;
+            const spec = document.getElementById('modalSuppSpec').value;
+            const addr = document.getElementById('modalSuppAddr').value;
+
+            if (!name) return;
+
+            suppliers.push({
+                id: String(Date.now()).slice(-4),
+                name, phone, spec, addr
+            });
+
+            localStorage.setItem('gcs_suppliers', JSON.stringify(suppliers));
+            renderSuppliersTable();
+            closeSupplierModal();
+        }
+
+        function deleteSupplier(id) {
+            suppliers = suppliers.filter(s => s.id !== id);
+            localStorage.setItem('gcs_suppliers', JSON.stringify(suppliers));
+            renderSuppliersTable();
+        }
+
+        function renderSuppliersTable() {
+            const tbody = document.getElementById('suppliersTable');
+            tbody.innerHTML = '';
+            suppliers.forEach(s => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-700/30 border-b border-slate-700/50">
+                        <td class="p-3 font-bold text-slate-200">${s.name}</td>
+                        <td class="p-3 font-mono text-indigo-300">${s.phone}</td>
+                        <td class="p-3">${s.spec}</td>
+                        <td class="p-3 text-slate-400">${s.addr}</td>
+                        <td class="p-3 text-center">
+                            <button onclick="deleteSupplier('${s.id}')" class="text-rose-400 hover:text-rose-300"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        // Maintenance Modal Functions
+        function openAddMaintenanceModal() {
+            document.getElementById('modalMaintClient').value = '';
+            document.getElementById('modalMaintDevice').value = '';
+            document.getElementById('modalMaintTech').value = '';
+            document.getElementById('modalMaintCost').value = '';
+            document.getElementById('maintenanceModal').classList.remove('hidden');
+        }
+
+        function closeMaintenanceModal() {
+            document.getElementById('maintenanceModal').classList.add('hidden');
+        }
+
+        function saveMaintenanceModal() {
+            const client = document.getElementById('modalMaintClient').value;
+            const device = document.getElementById('modalMaintDevice').value;
+            const tech = document.getElementById('modalMaintTech').value;
+            const cost = parseFloat(document.getElementById('modalMaintCost').value) || 0;
+
+            if (!client || !device) return;
+
+            maintenance.push({
+                id: 'M-' + (Math.floor(Math.random() * 800) + 100),
+                client, device, tech, cost, status: 'جديد'
+            });
+
+            localStorage.setItem('gcs_maintenance', JSON.stringify(maintenance));
+            renderMaintenanceTable();
+            closeMaintenanceModal();
+        }
+
+        function renderMaintenanceTable() {
+            const tbody = document.getElementById('maintenanceTable');
+            tbody.innerHTML = '';
+            maintenance.forEach(m => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-700/30 border-b border-slate-700/50">
+                        <td class="p-3 font-mono text-indigo-300 font-bold">#${m.id}</td>
+                        <td class="p-3 font-bold text-slate-200">${m.client}</td>
+                        <td class="p-3">${m.device}</td>
+                        <td class="p-3 text-center text-slate-400">${m.tech}</td>
+                        <td class="p-3 text-center font-bold text-emerald-400">${m.cost} ج.م</td>
+                        <td class="p-3 text-center"><span class="bg-indigo-950 text-indigo-300 border border-indigo-700 px-2.5 py-1 rounded-full text-xs font-bold">${m.status}</span></td>
+                        <td class="p-3 text-center">
+                            <button onclick="deleteMaintenance('${m.id}')" class="text-rose-400 hover:text-rose-300"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function deleteMaintenance(id) {
+            maintenance = maintenance.filter(m => m.id !== id);
+            localStorage.setItem('gcs_maintenance', JSON.stringify(maintenance));
+            renderMaintenanceTable();
+        }
+
+        // History Table Function
+        function renderHistoryTable() {
+            const tbody = document.getElementById('historyTable');
+            tbody.innerHTML = '';
+            docHistory.forEach(d => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-700/30 border-b border-slate-700/50">
+                        <td class="p-3 font-mono font-bold text-indigo-300">${d.num}</td>
+                        <td class="p-3"><span class="bg-slate-900 px-2 py-0.5 rounded text-xs">${d.type}</span></td>
+                        <td class="p-3 font-bold text-slate-200">${d.client}</td>
+                        <td class="p-3 text-center text-slate-400">${d.date}</td>
+                        <td class="p-3 text-center font-bold text-emerald-400">${d.total}</td>
+                        <td class="p-3 text-center">
+                            <button onclick="window.print()" class="text-indigo-400 hover:text-indigo-300 font-bold"><i class="fa-solid fa-print"></i> طباعة</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+    </script>
+
+    <!-- ========================================== -->
+    <!--  مكان إضافة كود FIREBASE CONFIG الخاص بك  -->
+    <!-- ========================================== -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, onSnapshot, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // بيانات مشروعك الحقيقي على Firebase GCS s
+        const firebaseConfig = {
+            apiKey: "AIzaSyAjuiI9pAtfRidqPOLRQ5Msq1FBqhEN0w6k",
+            authDomain: "gcs-s-f18bb.firebaseapp.com",
+            projectId: "gcs-s-f18bb",
+            storageBucket: "gcs-s-f18bb.firebasestorage.app",
+            messagingSenderId: "603716945465",
+            appId: "1:603716945465:web:62843c3ad96a1efab3afe8",
+            measurementId: "G-YJMCVWR3SQ"
+        };
+
+        // تهيئة اتصال Firebase Firestore
+        try {
+            const app = initializeApp(firebaseConfig);
+            const db = getFirestore(app);
+            window.db = db;
+            console.log("تم الاتصال بـ Firebase Firestore لمشروع gcs-s-f18bb بنجاح!");
+
+            // مزامنة المخزن لحظياً من Firebase
+            onSnapshot(collection(db, "inventory"), (snapshot) => {
+                const items = [];
+                snapshot.forEach((doc) => items.push({ id: doc.id, ...doc.data() }));
+                if (items.length > 0) {
+                    inventory = items;
+                    localStorage.setItem('gcs_inventory', JSON.stringify(inventory));
+                    if (typeof renderInventoryTable === 'function') renderInventoryTable();
+                    if (typeof renderSelectProducts === 'function') renderSelectProducts();
+                }
+            });
+        } catch (e) {
+            console.error("خطأ في الاتصال بـ Firebase:", e);
         }
     </script>
 </body>
